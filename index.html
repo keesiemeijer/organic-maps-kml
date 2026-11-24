@@ -101,7 +101,6 @@
             <label>Paste Overpass Turbo KML</label>
             <textarea id="kml" placeholder="Paste KML here..."></textarea>
             <div>
-                <button type="button" class="sec" onclick="pasteKml()">Paste</button>
                 <button
                     type="button"
                     class="sec"
@@ -138,14 +137,6 @@
                 "website:menu",
                 "phone",
             ];
-
-            async function pasteKml() {
-                try {
-                    document.getElementById("kml").value = await navigator.clipboard.readText();
-                } catch (e) {
-                    document.getElementById("msg").textContent = "Please paste manually (Ctrl+V / Cmd+V).";
-                }
-            }
 
             function convertKml() {
                 const raw = document.getElementById("kml").value.trim();
