@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Overpass KML to Organic Maps</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                max-width: 680px;
+                margin: 20px auto;
+                padding: 0 16px;
+                background: #f6f8fa;
+            }
+            .card {
+                background: #fff;
+                border: 1px solid #d0d7de;
+                border-radius: 8px;
+                padding: 18px;
+            }
+            .row {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+            }
+            .row > div {
+                flex: 1;
+                min-width: 200px;
+            }
+            label {
+                display: block;
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 4px;
+            }
+            input,
+            select,
+            textarea {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                box-sizing: border-box;
+                font-size: 14px;
+            }
+            textarea {
+                height: 180px;
+                font-family: monospace;
+                font-size: 12px;
+            }
+            button {
+                background: #1a7f37;
+                color: #fff;
+                border: 0;
+                border-radius: 6px;
+                padding: 10px 16px;
+                font-weight: 600;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+            button.sec {
+                background: #eaeef2;
+                color: #24292f;
+                margin-right: 8px;
+            }
+            #msg {
+                margin-top: 10px;
+                font-size: 14px;
+                font-weight: 500;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Overpass KML &rarr; Organic Maps</h2>
+            <div class="row">
+                <div><label>Bookmark List Name</label><input id="name" value="My Map Pins" /></div>
+                <div>
+                    <label>Pin Color</label>
+                    <select id="color">
+                        <option value="placemark-red">Red</option>
+                        <option value="placemark-blue">Blue</option>
+                        <option value="placemark-purple" selected>Purple</option>
+                        <option value="placemark-yellow">Yellow</option>
+                        <option value="placemark-pink">Pink</option>
+                        <option value="placemark-brown">Brown</option>
+                        <option value="placemark-green">Green</option>
+                        <option value="placemark-orange">Orange</option>
+                        <option value="placemark-deeppurple">Deep Purple</option>
+                        <option value="placemark-lightblue">Light Blue</option>
+                        <option value="placemark-cyan">Cyan</option>
+                        <option value="placemark-teal">Teal</option>
+                        <option value="placemark-lime">Lime</option>
+                        <option value="placemark-deeporange">Deep Orange</option>
+                        <option value="placemark-gray">Gray</option>
+                        <option value="placemark-bluegray">Blue Gray</option>
+                    </select>
+                </div>
+            </div>
+            <label>Paste Overpass Turbo KML</label>
+            <textarea id="kml" placeholder="Paste KML here..."></textarea>
+            <div>
+                <button type="button" class="sec" onclick="pasteKml()">Paste</button>
+                <button
+                    type="button"
+                    class="sec"
+                    onclick="
+                        document.getElementById('kml').value = '';
+                        document.getElementById('msg').textContent = '';
+                    "
+                >
+                    Clear
+                </button>
+                <button type="button" onclick="convertKml()">Download Organic Maps KML</button>
+            </div>
+            <div id="msg"></div>
+        </div>
+        <script>
+            const tagsList = [
+                "amenity",
+                "shop",
+                "craft",
+                "tourism",
+                "leisure",
+                "cuisine",
+                "diet:vegetarian",
+                "diet:vegan",
+                "opening_hours",
+                "reservation",
+                "takeaway",
+                "outdoor_seating",
+                "indoor_seating",
+                "internet_access",
+                "wheelchair",
+                "description",
+                "website",
+                "website:menu",
+                "phone",
+            ];
+
+            async function pasteKml() {
+                try {
+                    document.getElementById("kml").value = await navigator.clipboard.readText();
+                } catch (e) {
+                    document.getElementById("msg").textContent = "Please paste manually (Ctrl+V / Cmd+V).";
+                }
+            }
+
+            function convertKml() {
+                const raw = document.getElementById("kml").value.trim();
+                const xml = new DOMParser().parseFromString(raw, "application/xml");
+                if (!raw || xml.querySelector("parsererror")) {
+                    document.getElementById("msg").textContent = "Invalid KML.";
+                    return;
+                }
+                const root = xml.documentElement,
+                    ns = root.namespaceURI;
+                const mk = (t) => (ns ? xml.createElementNS(ns, t) : xml.createElement(t));
+                const doc = root.getElementsByTagName("Document").item(0) || root;
+                const listName = document.getElementById("name").value.trim() || "Organic Maps Pins";
+                const pin = document.getElementById("color").value;
+                let dn = Array.from(doc.children).find((e) => e.localName === "name") || doc.insertBefore(mk("name"), doc.firstChild);
+                dn.textContent = listName;
+                const st = mk("Style");
+                st.setAttribute("id", pin);
+                const is = mk("IconStyle"),
+                    ic = mk("Icon"),
+                    hr = mk("href");
+                hr.textContent = "https://omaps.app" + pin + ".png";
+                ic.appendChild(hr);
+                is.appendChild(ic);
+                st.appendChild(is);
+                doc.appendChild(st);
+                const pms = Array.from(doc.getElementsByTagName("Placemark"));
+                for (const pm of pms) {
+                    let su = Array.from(pm.children).find((e) => e.localName === "styleUrl") || pm.appendChild(mk("styleUrl"));
+                    su.textContent = "#" + pin;
+                    const tags = {};
+                    for (const d of Array.from(pm.getElementsByTagName("Data"))) {
+                        const k = d.getAttribute("name"),
+                            v = d.getElementsByTagName("value").item(0);
+                        if (k && v && v.textContent) tags[k] = v.textContent.trim();
+                    }
+                    let nm = Array.from(pm.children).find((e) => e.localName === "name");
+                    if (!nm || !nm.textContent.trim() || /^(node|way|relation)\//.test(nm.textContent.trim())) {
+                        if (!nm) nm = pm.appendChild(mk("name"));
+                        nm.textContent = (tags.name || tags.amenity || tags.shop || tags.tourism || tags.leisure || "Map Pin").replace(/_/g, " ");
+                    }
+                    const desc = tagsList.filter((k) => tags[k]).map((k) => k.replace(/[:_]/g, " ") + ": " + tags[k]);
+                    if (desc.length) {
+                        let de = Array.from(pm.children).find((e) => e.localName === "description") || pm.appendChild(mk("description"));
+                        de.textContent = desc.join("\n");
+                    }
+                }
+                const out = new XMLSerializer().serializeToString(xml);
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(new Blob([out], { type: "application/vnd.google-earth.kml+xml" }));
+                a.download = listName.replace(/[^a-z0-9_-]+/gi, "_") + ".kml";
+                a.click();
+                document.getElementById("msg").textContent = "Downloaded " + pms.length + " pins!";
+            }
+        </script>
+    </body>
+</html>
